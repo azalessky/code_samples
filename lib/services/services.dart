@@ -1,4 +1,9 @@
+export 'alarm_service.dart';
 export 'analytics_service.dart';
 export 'auth_service.dart';
-export 'subscription_service.dart';
+export 'device_service.dart';
+export 'firestore_service.dart';
+export 'focus_service.dart';
+export 'notification_service.dart';
+export 'review_service.dart';
 export 'update_service.dart';

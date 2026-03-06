@@ -1,87 +1,67 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_riverpod/misc.dart';
 
 import 'package:student_planner/common/common.dart';
-import 'package:student_planner/helpers/helpers.dart';
 import 'package:student_planner/models/models.dart';
 import 'package:student_planner/providers/providers.dart';
 import 'package:student_planner/services/services.dart';
-import 'package:student_planner/features/shared/shared.dart';
+import 'package:student_planner/shared/shared.dart';
 
 @RoutePage()
-class SubjectsScreen extends ConsumerWidget {
+class SubjectsScreen extends EntityListScreen<Subject> {
   const SubjectsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final subjects = ref.watch(subjectsProvider);
-    logEvent(AnalyticsEvent.subjectsShowList);
+  ConsumerState<EntityListScreen<Subject>> createState() => _SubjectsScreenState();
+}
 
-    return BackgroundScaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('SubjectsScreen.Title').tr(),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => showPromptDialog(
-              context: context,
-              title: 'Prompt.Confirmation'.tr(),
-              text: 'Prompt.ResetSubjects'.tr(),
-              onConfirmed: () => _resetSubjects(ref),
-            ),
-          ),
-        ],
-      ),
-      body: subjects.isNotEmpty
-          ? _buildSubjectList(context, ref, subjects)
-          : SpacePlaceholder(text: 'SubjectsScreen.NoData'.tr()),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () => context.pushRoute(SubjectDetailRoute()),
-      ),
-    );
-  }
+class _SubjectsScreenState extends EntityListState<Subject, SubjectsScreen> {
+  @override
+  String get title => t.subjectsScreen.title;
 
-  Widget _buildSubjectList(BuildContext context, WidgetRef ref, List<Subject> subjects) {
-    return ListView(
-      children: subjects
-          .map(
-            (subject) => DismissibleTile(
-              key: ValueKey(subject),
-              action: DismissibleAction.actionDelete,
-              promptTitle: subject.name,
-              promptText: 'Prompt.DeleteSubject'.tr(),
-              onDismissed: (_) => _deleteSubject(ref, subject.id),
-              child: _buildSubjectTile(context, subject),
-            ),
-          )
-          .toList(),
-    );
-  }
+  @override
+  String get emptyText => t.subjectsScreen.noData;
 
-  Widget _buildSubjectTile(BuildContext context, Subject subject) {
-    return ListTile(
-      key: ValueKey(subject),
-      title: Text(subject.name),
-      trailing: context.textMedium(subject.room),
-      onTap: () => context.pushRoute(SubjectDetailRoute(subject: subject)),
-    );
-  }
+  @override
+  String get deleteText => t.prompt.deleteSubject;
 
-  void _deleteSubject(WidgetRef ref, String subjectId) {
-    logEvent(AnalyticsEvent.subjectsDeleteItem);
+  @override
+  String get resetText => t.prompt.resetSubjects;
 
-    ref.read(subjectsProvider.notifier).removeItem(subjectId);
-    cachedRepository.saveData();
-  }
+  @override
+  ProviderBase<List<Subject>> get provider => subjectsProvider;
 
-  void _resetSubjects(WidgetRef ref) {
-    logEvent(AnalyticsEvent.subjectsResetItems);
+  @override
+  String Function(Subject item) get itemTitle =>
+      (item) => item.name;
 
-    ref.read(subjectsProvider.notifier).resetSubjects();
-    cachedRepository.saveData();
+  @override
+  Subject Function() get emptyItem =>
+      () => Subject.empty();
+
+  @override
+  PageRouteInfo Function(Subject item) get detailRoute =>
+      (value) => SubjectDetailRoute(value: value);
+
+  @override
+  AnalyticsEvent get deleteEvent => AnalyticsEvent.subjectsDeleteItem;
+
+  @override
+  AnalyticsEvent get resetEvent => AnalyticsEvent.subjectsResetItems;
+
+  @override
+  void deleteItem(Subject item) => ref.read(subjectsProvider.notifier).removeItem(item.id);
+
+  @override
+  void resetItems() => ref.read(subjectsProvider.notifier).resetSubjects();
+
+  @override
+  void saveData() => ref.read(subjectsProvider.notifier).save();
+
+  @override
+  Widget buildTile(Subject subject) {
+    return ListTile(title: Text(subject.name));
   }
 }

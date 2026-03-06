@@ -1,65 +1,106 @@
+import 'dart:async';
+
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 
+import 'package:student_planner/common/common.dart';
+
 enum AnalyticsEvent {
-  assignmentsShowList,
-  assignmentsMarkCompleted,
-  assignmentsShowItem,
   assignmentsUpdateItem,
-  assignmentsPickImage,
-  assignmentsViewImage,
+  assignmentsDeleteItem,
+  assignmentsArchiveItem,
+  assignmentsCompleteItem,
+  assignmentsShareContent,
+  assignmentsAddImage,
   assignmentsDeleteImage,
-  assignmentsShareText,
-  assignmentsShareImages,
+  assignmentsAddLabel,
+  assignmentsAddText,
+  assignmentsAddList,
+  labelsUpdateItem,
+  labelsDeleteItem,
+  labelsResetItems,
   notesUpdateItem,
   notesDeleteItem,
-  subjectsShowList,
   subjectsUpdateItem,
   subjectsDeleteItem,
   subjectsResetItems,
-  teachersShowList,
   teachersUpdateItem,
   teachersDeleteItem,
-  termsShowList,
   termsUpdateItem,
   termsDeleteItem,
-  bellsShowList,
   bellsUpdateItem,
-  gradesSwitchView,
-  gradesShowBook,
-  gradesShowReport,
-  gradesShowHistory,
-  gradesSelectGrade,
-  scheduleResetScroll,
-  scheduleSelectSubject,
-  scheduleSelectGrade,
-  subscriptionsShowList,
-  subscriptionsPurchase,
-  subscriptionsCancel,
-  subscriptionsResume,
-  userSignIn,
-  userSignOut,
-  settingsDeleteProfile,
+  gradesUpdateItem,
+  gradesDeleteItem,
+  lessonsUpdateItem,
+  lessonsDeleteItem,
+  lessonsShareContent,
   settingsUpdate,
-  syncDataUpdated,
+  userDeleteProfile,
+  userRateApp,
+  userSignIn,
+  userSignInAnonymously,
+  userSignOut,
+  updateCheck,
+  updateInstall,
+  deepLinkOpen,
 }
 
+final logEvent = AnalyticsService.instance.logEvent;
+final logError = AnalyticsService.instance.logError;
+final logScreen = AnalyticsService.instance.logScreen;
+
 class AnalyticsService {
-  final analytics = FirebaseAnalytics.instance;
+  static final instance = AnalyticsService._();
 
-  Future<void> logEvent(AnalyticsEvent event) async {
-    final name = _camelToSnake(event.name);
+  final _auth = FirebaseAuth.instance;
+  final _analytics = FirebaseAnalytics.instance;
+  final _crashlytics = FirebaseCrashlytics.instance;
+  late final StreamSubscription _authSubscription;
 
+  AnalyticsService._();
+
+  static void initialize() {
+    instance._authSubscription = instance._auth.authStateChanges().listen(
+      (User? user) => instance._crashlytics.setUserIdentifier(user?.uid ?? ''),
+    );
+  }
+
+  static void dispose() {
+    instance._authSubscription.cancel();
+  }
+
+  Future<void> logEvent(AnalyticsEvent event, [Map<String, Object>? params]) async {
     try {
-      await analytics.logEvent(name: name);
-      debugPrint('logEvent: event=$name');
-    } catch (e) {
-      debugPrint('logEvent: $e}');
+      final eventName = event.name.toSeparated('_');
+      final debugLog = params?.isNotEmpty == true ? '$eventName $params' : eventName;
+
+      debugPrint('AnalyticsService.logEvent: $debugLog');
+      if (Firebase.apps.isEmpty) return;
+
+      await _analytics.logEvent(name: eventName, parameters: params);
+    } catch (e, st) {
+      debugPrint('AnalyticsService.logEvent: $e');
+      logError(e, st);
     }
   }
 
-  String _camelToSnake(String str) {
-    final regex = RegExp(r'(?<=[a-z])(?=[A-Z])');
-    return str.split(regex).join('_').toLowerCase();
+  Future<void> logError(dynamic exception, StackTrace? stack) async {
+    debugPrint('AnalyticsService.logError: $exception\n$stack');
+    if (Firebase.apps.isEmpty) return;
+
+    await _crashlytics.recordError(exception, stack);
+  }
+
+  Future<void> logScreen(String routeName) async {
+    final screenName = routeName.replaceAll(RegExp(r'(Route|View)$'), '').toSeparated('-');
+    final screenClass = routeName;
+
+    debugPrint('AnalyticsService.logScreen: $screenName');
+    if (Firebase.apps.isEmpty) return;
+
+    await _analytics.logScreenView(screenName: screenName, screenClass: screenClass);
   }
 }

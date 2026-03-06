@@ -1,131 +1,106 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:student_planner/common/common.dart';
-import 'package:student_planner/helpers/helpers.dart';
 import 'package:student_planner/models/models.dart';
 import 'package:student_planner/providers/providers.dart';
 import 'package:student_planner/services/services.dart';
-import 'package:student_planner/features/shared/shared.dart';
 import 'package:student_planner/features/profile/profile.dart';
+import 'package:student_planner/shared/shared.dart';
 
 @RoutePage()
-class TeacherDetailScreen extends ConsumerStatefulWidget {
-  final Teacher? teacher;
-
+class TeacherDetailScreen extends EntityDetailScreen<Teacher> {
   const TeacherDetailScreen({
-    this.teacher,
+    required super.value,
     super.key,
   });
 
   @override
-  ConsumerState<TeacherDetailScreen> createState() => _TeacherDetailScreenState();
+  ConsumerState<TeacherDetailScreen> createState() => _TeacherDetailState();
 }
 
-class _TeacherDetailScreenState extends ConsumerState<TeacherDetailScreen> {
-  final formKey = GlobalKey<FormState>();
-  late Teacher teacher;
+class _TeacherDetailState extends EntityDetailState<Teacher, TeacherDetailScreen> {
+  @override
+  String get title => t.teacherDetailScreen.title;
 
   @override
-  void initState() {
-    super.initState();
-    teacher = widget.teacher ?? Teacher.empty();
-  }
+  String get deleteText => t.prompt.deleteTeacher;
 
   @override
-  Widget build(BuildContext context) {
+  String get deleteTitle => value.name;
+
+  @override
+  AnalyticsEvent get updateEvent => AnalyticsEvent.teachersUpdateItem;
+
+  @override
+  AnalyticsEvent get deleteEvent => AnalyticsEvent.teachersDeleteItem;
+
+  @override
+  bool isEmpty(Teacher item) => item.name.isEmpty;
+
+  @override
+  void updateItem(Teacher item) => ref.read(teachersProvider.notifier).setItem(item);
+
+  @override
+  void deleteItem(Teacher item) => ref.read(teachersProvider.notifier).removeItem(item.id);
+
+  @override
+  void saveData() => ref.read(teachersProvider.notifier).save();
+
+  @override
+  Widget buildForm(BuildContext context) {
     final subjects = ref.read(subjectsProvider.notifier).names;
 
-    return BackgroundScaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: Text('TeacherDetailScreen.Title'.tr()),
-        actions: [
-          if (widget.teacher != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outlined),
-              onPressed: () => showPromptDialog(
-                context: context,
-                title: teacher.name,
-                text: 'Prompt.DeleteTeacher'.tr(),
-                onConfirmed: _deleteTeacher,
-              ),
-            ),
-        ],
-      ),
-      body: Form(
-        key: formKey,
-        child: SingleChildScrollView(
-          padding: FormLayout.formPadding,
-          child: Column(
-            children: [
-              AvatarField(
-                avatar: teacher.avatar,
-                name: teacher.name,
-                radius: 32,
-                onSaved: (value) => teacher = teacher.copyWith(avatar: value),
-              ),
-              FormLayout.sectionSpacer,
-              TextFormField(
-                autofocus: true,
-                initialValue: teacher.name,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(FieldConstraints.teacherNameLength)
-                ],
-                decoration: InputDecoration(hintText: 'TeacherDetailScreen.NameHint'.tr()),
-                textCapitalization: TextCapitalization.sentences,
-                validator: TextRequiredValidator().validate,
-                onSaved: (value) => teacher = teacher.copyWith(name: value!),
-              ),
-              FormLayout.fieldSpacer,
-              TextChipField(
-                values: subjects,
-                initialValue: teacher.subjects,
-                hintText: 'TeacherDetailScreen.SubjectHint'.tr(),
-                onSaved: (value) => teacher = teacher.copyWith(subjects: value),
-              ),
-              FormLayout.fieldSpacer,
-              TextFormField(
-                initialValue: teacher.note,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(FieldConstraints.teacherNoteLength)
-                ],
-                decoration: InputDecoration(hintText: 'TeacherDetailScreen.NoteHint'.tr()),
-                textCapitalization: TextCapitalization.sentences,
-                onSaved: (value) => teacher = teacher.copyWith(note: value!),
-              ),
-            ],
-          ),
+    return Column(
+      children: [
+        AvatarField(
+          key: ObjectKey(value),
+          initialValue: value.photo,
+          name: value.name,
+          radius: 32,
+          onSaved: (photo) => value = value.copyWith(photo: photo),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _submitForm,
-        child: const Icon(Icons.save),
-      ),
+        FormLayout.sectionSpacer,
+        TextFormField(
+          autofocus: isEmpty(value),
+          initialValue: value.name,
+          inputFormatters: [LengthLimitingTextInputFormatter(FieldConstraints.teacherNameLength)],
+          decoration: InputDecoration(hintText: t.teacherDetailScreen.nameHint),
+          textCapitalization: .sentences,
+          validator: TextRequiredValidator().validate,
+          onSaved: (name) => value = value.copyWith(name: name!),
+        ),
+        FormLayout.fieldSpacer,
+        ObjectListField<String>(
+          initialValue: value.subjects,
+          hintText: t.teacherDetailScreen.subjectHint,
+          textBuilder: (subject) => subject,
+          addItem: (current) => _addSubject(subjects, current),
+          onSaved: (subjects) => value = value.copyWith(subjects: subjects),
+        ),
+        FormLayout.fieldSpacer,
+        TextFormField(
+          initialValue: value.note,
+          inputFormatters: [LengthLimitingTextInputFormatter(FieldConstraints.teacherNoteLength)],
+          decoration: InputDecoration(hintText: t.teacherDetailScreen.noteHint),
+          maxLines: null,
+          keyboardType: .multiline,
+          textInputAction: .newline,
+          textCapitalization: .sentences,
+          onSaved: (note) => value = value.copyWith(note: note!),
+        ),
+      ],
     );
   }
 
-  void _deleteTeacher() {
-    logEvent(AnalyticsEvent.teachersDeleteItem);
-
-    FocusManager.instance.primaryFocus?.unfocus();
-    context.maybePop();
-
-    ref.read(teachersProvider.notifier).removeItem(teacher.id);
-    cachedRepository.saveData();
-  }
-
-  void _submitForm() {
-    if (formKey.currentState!.validate()) {
-      formKey.currentState!.save();
-      context.maybePop();
-
-      logEvent(AnalyticsEvent.teachersUpdateItem);
-      ref.read(teachersProvider.notifier).setItem(teacher);
-      cachedRepository.saveData();
-    }
+  Future<String?> _addSubject(List<String> subjects, List<String> value) async {
+    return showModalDialog<String>(
+      builder: (_) => ValueListDialog(
+        values: subjects.excludeList(value),
+        textBuilder: (value) => value,
+      ),
+    );
   }
 }

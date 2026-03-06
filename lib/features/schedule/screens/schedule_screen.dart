@@ -1,20 +1,23 @@
-import 'package:intl/intl.dart';
-import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:weekly_tab_pager/weekly_tab_pager.dart';
 
 import 'package:student_planner/common/common.dart';
-import 'package:student_planner/helpers/helpers.dart';
 import 'package:student_planner/providers/providers.dart';
-import 'package:student_planner/services/services.dart';
-import 'package:student_planner/features/shared/shared.dart';
 import 'package:student_planner/features/schedule/schedule.dart';
+
+class ScheduleTabs {
+  static void showScheduleDaily(BuildContext context) {
+    return AutoTabsRouter.of(context).setActiveIndex(0);
+  }
+
+  static void showScheduleWeekly(BuildContext context) {
+    return AutoTabsRouter.of(context).setActiveIndex(1);
+  }
+}
 
 @RoutePage()
 class ScheduleScreen extends ConsumerStatefulWidget {
-  static const maxWeekCount = 1000;
-
   const ScheduleScreen({super.key});
 
   @override
@@ -22,91 +25,49 @@ class ScheduleScreen extends ConsumerStatefulWidget {
 }
 
 class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
-  late DateTime today;
-  late WeeklyTabController controller;
-  late ValueNotifier<ScheduleResetButton> resetButton;
-  late ValueNotifier<DateTime> titleDate;
+  late DateTime _initialDate;
+  ScheduleController? _scheduleController;
 
   @override
   void initState() {
     super.initState();
 
-    final weekdays = ref.read(settingsProvider).studyWeek.studyDays;
-    today = WeeklyTabNavigator.calcSafeDate(DateTime.now(), weekdays);
-
-    controller = WeeklyTabController(position: today);
-    resetButton = ValueNotifier(ScheduleResetButton.hidden);
-    titleDate = ValueNotifier(today);
+    ref.listenManual(
+      settingsProvider.select((config) => config.schedule.classDays),
+      (_, classDays) => setState(() => _updateController(classDays)),
+      fireImmediately: true,
+    );
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    _scheduleController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsProvider);
-
-    return BackgroundScaffold(
-      appBar: AppBar(
-        title: ValueListenableBuilder(
-          valueListenable: titleDate,
-          builder: (_, valueDate, __) => ValueListenableBuilder(
-            valueListenable: resetButton,
-            builder: (_, valueButton, __) => ScheduleTitle(
-              initialDate: today,
-              currentDate: valueDate,
-              resetButton: valueButton,
-              onPressed: () => _resetScrollPosition(today),
-            ),
-          ),
+    return AutoTabsRouter(
+      routes: [
+        DailyScheduleRoute(
+          initialDate: _initialDate,
+          controller: _scheduleController!.dailyController,
         ),
-      ),
-      body: WeeklyTabNavigator(
-        controller: controller,
-        weekdays: settings.studyWeek.studyDays,
-        weekCount: ScheduleScreen.maxWeekCount,
-        tabBuilder: (_, date) => _buildTab(date),
-        pageBuilder: (_, date) => ScheduleView(date),
-        onTabScrolled: (value) => _updateTitle(value),
-        onTabChanged: (value) => _updateTitle(value),
-      ),
-    );
-  }
-
-  Widget _buildTab(DateTime date) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          DateFormat('E').format(date).toUpperCase(),
-          softWrap: false,
+        WeeklyScheduleRoute(
+          initialDate: _initialDate,
+          controller: _scheduleController!.weeklyController,
         ),
-        const SizedBox(height: 4),
-        Text(date.day.toString()),
       ],
+      builder: (_, child) => child,
     );
   }
 
-  void _updateTitle(DateTime date) {
-    titleDate.value = date;
-    _updateResetButton(date);
-  }
-
-  void _resetScrollPosition(DateTime date) {
-    controller.animateTo(date);
-    logEvent(AnalyticsEvent.scheduleResetScroll);
-  }
-
-  void _updateResetButton(DateTime date) {
-    if (date.isSameWeek(today)) {
-      resetButton.value = ScheduleResetButton.hidden;
-    } else if (date.isBefore(today)) {
-      resetButton.value = ScheduleResetButton.right;
-    } else if (date.isAfter(today)) {
-      resetButton.value = ScheduleResetButton.left;
-    }
+  void _updateController(List<int> classDays) {
+    _initialDate = DateHelper.safeToday(classDays);
+    _scheduleController?.dispose();
+    _scheduleController = ScheduleController(
+      position: _initialDate,
+      weekdays: classDays,
+    );
   }
 }

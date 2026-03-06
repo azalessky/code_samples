@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
+
+import 'package:student_planner/common/common.dart';
 
 import 'assignments_badge.dart';
 
@@ -24,11 +25,31 @@ class BottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      NavBarItem(Icons.home_outlined, Icons.home, 'HomeScreen.Schedule'.tr()),
-      NavBarItem(Icons.assignment_outlined, Icons.assignment, 'HomeScreen.Assignments'.tr()),
-      NavBarItem(Icons.notifications_outlined, Icons.notifications, 'HomeScreen.Bells'.tr()),
-      NavBarItem(Icons.leaderboard_outlined, Icons.leaderboard, 'HomeScreen.Grades'.tr()),
-      NavBarItem(Icons.account_circle_outlined, Icons.account_circle, 'HomeScreen.Profile'.tr()),
+      NavBarItem(
+        Icons.home_outlined,
+        Icons.home,
+        t.homeScreen.schedule,
+      ),
+      NavBarItem(
+        Icons.assignment_outlined,
+        Icons.assignment,
+        t.homeScreen.assignments,
+      ),
+      NavBarItem(
+        Icons.notifications_outlined,
+        Icons.notifications,
+        t.homeScreen.bells,
+      ),
+      NavBarItem(
+        Icons.leaderboard_outlined,
+        Icons.leaderboard,
+        t.homeScreen.grades,
+      ),
+      NavBarItem(
+        Icons.account_circle_outlined,
+        Icons.account_circle,
+        t.homeScreen.profile,
+      ),
     ];
 
     return BottomNavigationBar(

@@ -9,17 +9,22 @@ class NoteText extends StatelessWidget {
   final DateTime? date;
   final Decoration? decoration;
   final String? hintText;
+  final int maxLines;
 
   const NoteText({
     this.note,
     this.date,
     this.decoration,
     this.hintText,
+    this.maxLines = 3,
     super.key,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasText = note?.text.isNotEmpty == true;
+    final textColor = hasText ? null : Theme.of(context).hintColor;
+
     return Padding(
       padding: FormLayout.formPadding,
       child: InkWell(
@@ -27,13 +32,14 @@ class NoteText extends StatelessWidget {
           NoteDetailRoute(note: note, date: date),
         ),
         child: Container(
-          width: double.infinity,
+          width: .infinity,
           padding: FormLayout.textPadding,
           decoration: decoration,
           child: Text(
-            note?.text ?? hintText ?? '',
-            overflow: TextOverflow.ellipsis,
-            maxLines: 3,
+            hasText ? note!.text : hintText ?? '',
+            overflow: .ellipsis,
+            maxLines: maxLines,
+            style: TextStyle(color: textColor),
           ),
         ),
       ),

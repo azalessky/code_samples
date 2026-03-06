@@ -1,15 +1,14 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import 'package:student_planner/common/common.dart';
-import 'package:student_planner/helpers/helpers.dart';
 import 'package:student_planner/models/models.dart';
 import 'package:student_planner/providers/providers.dart';
 import 'package:student_planner/services/services.dart';
-import 'package:student_planner/features/shared/shared.dart';
+import 'package:student_planner/shared/shared.dart';
 
 @RoutePage()
 class NoteDetailScreen extends ConsumerStatefulWidget {
@@ -27,72 +26,59 @@ class NoteDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
-  final formKey = GlobalKey<FormState>();
-  final textNode = FocusNode();
-  late Note note;
-  late bool editMode;
+  final _formKey = GlobalKey<FormState>();
+  late Note _note;
 
   @override
   void initState() {
     super.initState();
-    note = widget.note ?? Note.empty().copyWith(date: widget.date!);
-    editMode = note.text.isEmpty;
+    _note = widget.note ?? Note.empty().copyWith(date: widget.date!);
   }
 
   @override
   Widget build(BuildContext context) {
     return BackgroundScaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: Text('NoteDetailScreen.Title'.tr()),
-        actions: [
-          if (widget.note != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () => showPromptDialog(
-                context: context,
-                title: 'Prompt.Confirmation'.tr(),
-                text: 'Prompt.DeleteNote'.tr(),
-                onConfirmed: _deleteNote,
-              ),
-            ),
-        ],
+      appBar: CustomAppBar(
+        title: t.noteDetailScreen.title,
+        subtitle: _note.date.format(DateFormat.MONTH_WEEKDAY_DAY),
+        actions: [if (widget.note != null) _buildDeleteButton()],
       ),
       body: Form(
-        key: formKey,
+        key: _formKey,
         child: SingleChildScrollView(
           padding: FormLayout.formPadding,
-          child: Column(
-            children: [
-              Center(
-                child: context.titleMedium(
-                  DateHelper.formatDayMonth(note.date),
-                ),
-              ),
-              FormLayout.fieldSpacer,
-              TextFormField(
-                focusNode: textNode,
-                autofocus: editMode,
-                maxLines: 5,
-                initialValue: note.text,
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(FieldConstraints.noteTextLength)
-                ],
-                decoration: InputDecoration(hintText: 'NoteDetailScreen.TextHint'.tr()),
-                textCapitalization: TextCapitalization.sentences,
-                validator: TextRequiredValidator().validate,
-                onSaved: (value) => note = note.copyWith(text: value!),
-                onTap: () => setState(() => editMode = true),
-              ),
-            ],
-          ),
+          child: _buildInputField(),
         ),
+        onPopInvokedWithResult: (_, result) {
+          if (result == null) _submitForm();
+        },
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: null,
-        onPressed: _submitForm,
-        child: Icon(editMode ? Icons.save : Icons.edit),
+    );
+  }
+
+  Widget _buildDeleteButton() {
+    return IconButton(
+      icon: const Icon(Icons.delete_outline),
+      onPressed: () => showPromptDialog(
+        title: t.prompt.titleConfirmation,
+        text: t.prompt.deleteNote,
+        onConfirmed: _deleteNote,
       ),
+    );
+  }
+
+  Widget _buildInputField() {
+    return TextFormField(
+      autofocus: _note.text.isEmpty,
+      minLines: 5,
+      maxLines: null,
+      initialValue: _note.text,
+      keyboardType: .multiline,
+      textInputAction: .newline,
+      textCapitalization: .sentences,
+      decoration: InputDecoration(hintText: t.noteDetailScreen.textHint),
+      inputFormatters: [LengthLimitingTextInputFormatter(FieldConstraints.noteTextLength)],
+      onSaved: (value) => _note = _note.copyWith(text: value!),
     );
   }
 
@@ -100,27 +86,21 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     logEvent(AnalyticsEvent.notesDeleteItem);
 
     FocusManager.instance.primaryFocus?.unfocus();
-    context.maybePop();
+    context.maybePop(_note);
 
-    ref.read(notesProvider.notifier).removeItem(note.id);
-    cachedRepository.saveData();
+    ref.read(notesProvider.notifier).removeItem(_note.id);
+    ref.read(notesProvider.notifier).save();
   }
 
   void _submitForm() {
-    if (editMode) {
-      if (formKey.currentState!.validate()) {
-        formKey.currentState!.save();
-        context.maybePop();
+    if (_formKey.currentState!.validate()) {
+      logEvent(AnalyticsEvent.notesUpdateItem);
 
-        logEvent(AnalyticsEvent.notesUpdateItem);
-        ref.read(notesProvider.notifier).setItem(note);
-        cachedRepository.saveData();
-      }
-    } else {
-      setState(() {
-        editMode = true;
-        textNode.requestFocus();
-      });
+      _formKey.currentState!.save();
+      if (_note == widget.note) return;
+
+      ref.read(notesProvider.notifier).setItem(_note);
+      ref.read(notesProvider.notifier).save();
     }
   }
 }

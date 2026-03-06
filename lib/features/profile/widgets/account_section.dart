@@ -1,26 +1,27 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:collection/collection.dart';
 
 import 'package:student_planner/common/common.dart';
-import 'package:student_planner/helpers/helpers.dart';
 import 'package:student_planner/models/models.dart';
-import 'package:student_planner/providers/providers.dart';
-import 'package:student_planner/features/shared/shared.dart';
+import 'package:student_planner/shared/shared.dart';
 
 class AccountSection extends ConsumerStatefulWidget {
-  final String signInText;
-  final String welcomeText;
+  static const avatarSize = 32.0;
+
+  final Account account;
+  final String signInTitle;
+  final String Function(String) welcomeText;
   final void Function() onSignIn;
 
   const AccountSection({
-    required this.signInText,
+    super.key,
+    required this.account,
+    required this.signInTitle,
     required this.welcomeText,
     required this.onSignIn,
-    super.key,
   });
 
   @override
@@ -28,18 +29,18 @@ class AccountSection extends ConsumerStatefulWidget {
 }
 
 class _AccountSectionState extends ConsumerState<AccountSection> {
-  final tooltipKey = GlobalKey<TooltipState>();
+  final _tooltipKey = GlobalKey<TooltipState>();
 
   @override
   Widget build(BuildContext context) {
-    final account = ref.watch(accountsProvider);
-
     return Column(
       children: [
         FormLayout.mediumSpacer,
-        _buildUserAvatar(account.photoUrl),
+        _buildUserAvatar(widget.account.photoUrl),
         FormLayout.smallSpacer,
-        account.isSignedIn ? _buildAccountInfo(account) : _buildSignInButton(context),
+        widget.account.email.isEmpty
+            ? _buildSignInButton(context)
+            : _buildAccountInfo(widget.account),
         FormLayout.mediumSpacer,
       ],
     );
@@ -47,9 +48,9 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
 
   Widget _buildUserAvatar(String photoUrl) {
     return CircleAvatar(
-      radius: 32,
+      radius: AccountSection.avatarSize,
       foregroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-      child: const Icon(Icons.person, size: 32),
+      child: const Icon(Icons.person, size: AccountSection.avatarSize),
     );
   }
 
@@ -57,7 +58,7 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     return Padding(
       padding: FormLayout.formPadding,
       child: Tooltip(
-        key: tooltipKey,
+        key: _tooltipKey,
         message: account.email,
         triggerMode: TooltipTriggerMode.tap,
         child: _buildWelcomeText(account.email, account.displayName),
@@ -69,19 +70,20 @@ class _AccountSectionState extends ConsumerState<AccountSection> {
     return TextButton(
       onPressed: () => Platform.isIOS
           ? showModalDialog<SignInMethod>(
-              context: context,
               builder: (context) => SignInDialog(methods: [SignInMethod.apple]),
               onSaved: (value) => widget.onSignIn(),
             )
           : widget.onSignIn(),
-      child: Text(widget.signInText),
+      child: Text(widget.signInTitle),
     );
   }
 
   Widget _buildWelcomeText(String email, String displayName) {
     final name = displayName.isNotEmpty ? displayName : email.split('@').firstOrNull ?? email;
-    return context.titleMedium(
-      widget.welcomeText.tr(args: [name]),
+    return Text(
+      widget.welcomeText(name),
+      style: context.textTheme.titleMedium,
+      textAlign: TextAlign.center,
     );
   }
 }

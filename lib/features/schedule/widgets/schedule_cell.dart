@@ -1,21 +1,19 @@
 import 'package:flutter/material.dart';
 
+import 'package:student_planner/common/common.dart';
+
 class ScheduleCell extends StatelessWidget {
-  final String? text;
-  final TextStyle? textStyle;
-  final EdgeInsets? padding;
+  final EdgeInsets padding;
   final AlignmentGeometry alignment;
-  final Icon? icon;
+  final Widget? child;
   final VoidCallback? onTap;
 
   const ScheduleCell({
-    required this.text,
-    this.textStyle,
-    this.padding,
-    this.alignment = Alignment.center,
-    this.icon,
-    this.onTap,
     super.key,
+    this.padding = FormLayout.textPadding,
+    this.alignment = .center,
+    this.child,
+    this.onTap,
   });
 
   @override
@@ -23,26 +21,10 @@ class ScheduleCell extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: padding ?? const EdgeInsets.all(8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Align(
-                alignment: alignment,
-                child: Text(
-                  text ?? '',
-                  maxLines: 3,
-                  style: textStyle,
-                ),
-              ),
-            ),
-            if (icon != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: icon!,
-              )
-          ],
+        padding: padding,
+        child: Align(
+          alignment: alignment,
+          child: child,
         ),
       ),
     );

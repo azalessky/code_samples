@@ -17,14 +17,13 @@ class AssignmentsBadge extends ConsumerWidget {
     ref.watch(assignmentsProvider);
 
     final assignments = ref.read(assignmentsProvider.notifier);
-    final current = assignments.getAssignments(AssignmentStatus.current);
-    final overdue = assignments.getAssignments(AssignmentStatus.overdue);
-    final count = current.length + overdue.length;
+    final count = assignments.getAssignments(AssignmentStatus.current).length;
 
     return Badge.count(
       isLabelVisible: count > 0,
+      maxCount: 100,
       count: count,
-      backgroundColor: Theme.of(context).colorScheme.onErrorContainer,
+      backgroundColor: Theme.of(context).colorScheme.primary,
       child: child,
     );
   }

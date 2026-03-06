@@ -1,20 +1,21 @@
-import 'dart:math';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:random_avatar/random_avatar.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:student_planner/common/common.dart';
+import 'package:student_planner/shared/shared.dart';
 
 class AvatarField extends StatefulWidget {
-  final String avatar;
+  final String initialValue;
   final String name;
   final double radius;
   final void Function(String)? onSaved;
 
   const AvatarField({
-    required this.avatar,
+    required this.initialValue,
     required this.name,
-    this.radius = 24,
+    required this.radius,
     this.onSaved,
     super.key,
   });
@@ -24,41 +25,51 @@ class AvatarField extends StatefulWidget {
 }
 
 class _AvatarFieldState extends State<AvatarField> {
-  late String avatar;
+  late String _selectedValue;
+  final _pickerLock = AsyncLock();
 
   @override
   void initState() {
     super.initState();
-    avatar = widget.avatar;
+    _selectedValue = widget.initialValue;
   }
 
   @override
   Widget build(BuildContext context) {
     bool editMode = widget.onSaved != null;
+    final defaultAvatar = _buildCircleAvatar(widget.name, widget.radius);
 
     return FormField<String>(
-      builder: (state) => GestureDetector(
-        onTap: editMode ? () => _setAvatar(_generateAvatar()) : null,
-        onLongPress: editMode ? () => _setAvatar('') : null,
-        child: avatar.isNotEmpty
-            ? _buildRandomAvatar(avatar, widget.radius)
-            : _buildCircleAvatar(widget.name, widget.radius),
+      builder: (state) => SizedBox.square(
+        dimension: widget.radius * 2,
+        child: ShapedInkWell(
+          shape: const CircleBorder(),
+          onTap: editMode ? _pickImage : null,
+          onLongPress: (editMode && _selectedValue.isNotEmpty) ? _removeImage : null,
+          child: _selectedValue.isNotEmpty
+              ? _buildPhotoAvatar(_selectedValue, widget.radius, defaultAvatar)
+              : defaultAvatar,
+        ),
       ),
-      onSaved: (value) => widget.onSaved?.call(avatar),
+      onSaved: (value) => widget.onSaved?.call(_selectedValue),
     );
   }
 
-  Widget _buildRandomAvatar(String avatar, double radius) {
-    return RandomAvatar(
-      avatar,
-      trBackground: true,
-      width: radius * 2,
-      height: radius * 2,
+  Widget _buildPhotoAvatar(String photo, double radius, Widget fallback) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Image.file(
+        File(photo),
+        fit: .cover,
+        width: radius * 2,
+        height: radius * 2,
+        errorBuilder: (_, _, _) => fallback,
+      ),
     );
   }
 
   Widget _buildCircleAvatar(String name, double radius) {
-    final textTheme = Theme.of(context).textTheme.titleMedium!;
+    final textTheme = context.textTheme.titleMedium!;
 
     return name.isNotEmpty == true
         ? CircleAvatar(
@@ -66,10 +77,7 @@ class _AvatarFieldState extends State<AvatarField> {
             backgroundColor: _colorFromName(name),
             child: Text(
               name[0].toUpperCase(),
-              style: textTheme.copyWith(
-                color: Colors.white,
-                fontSize: radius,
-              ),
+              style: textTheme.copyWith(color: Colors.white, fontSize: radius),
             ),
           )
         : CircleAvatar(
@@ -78,13 +86,21 @@ class _AvatarFieldState extends State<AvatarField> {
           );
   }
 
-  void _setAvatar(String value) {
-    setState(() => avatar = value);
+  Future<void> _pickImage() async {
+    _pickerLock.run(() async {
+      final imagePath = await ImageStorage.pickImage(ImageSource.gallery);
+      if (imagePath != null) {
+        setState(() => _selectedValue = imagePath);
+      }
+    });
   }
 
-  String _generateAvatar() {
-    final random = Random();
-    return List.generate(12, (_) => random.nextInt(10)).join();
+  Future<void> _removeImage() async {
+    await showPromptDialog(
+      title: t.prompt.titleConfirmation,
+      text: t.prompt.deleteAvatar,
+      onConfirmed: () => setState(() => _selectedValue = ''),
+    );
   }
 
   Color _colorFromName(String name) {
@@ -92,6 +108,6 @@ class _AvatarFieldState extends State<AvatarField> {
     final index = hash % Colors.primaries.length;
 
     final color = Colors.primaries[index];
-    return color.withAlpha(FormStyles.avatarAlpha);
+    return Themes.alpha(context, color, FormStyles.avatarAlpha);
   }
 }

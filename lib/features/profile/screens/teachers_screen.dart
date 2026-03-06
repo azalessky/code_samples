@@ -1,81 +1,74 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_riverpod/misc.dart';
 
 import 'package:student_planner/common/common.dart';
-import 'package:student_planner/helpers/helpers.dart';
 import 'package:student_planner/models/models.dart';
 import 'package:student_planner/providers/providers.dart';
 import 'package:student_planner/services/services.dart';
-import 'package:student_planner/features/shared/shared.dart';
 import 'package:student_planner/features/profile/profile.dart';
+import 'package:student_planner/shared/shared.dart';
 
 @RoutePage()
-class TeachersScreen extends ConsumerWidget {
+class TeachersScreen extends EntityListScreen<Teacher> {
   const TeachersScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final teachers = ref.watch(teachersProvider);
-    logEvent(AnalyticsEvent.teachersShowList);
+  ConsumerState<EntityListScreen<Teacher>> createState() => _TeachersScreenState();
+}
 
-    return BackgroundScaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: Text('TeachersScreen.Title'.tr()),
-      ),
-      body: teachers.isNotEmpty
-          ? _buildTeacherList(context, ref, teachers)
-          : SpacePlaceholder(text: 'TeachersScreen.NoData'.tr()),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () => context.pushRoute(TeacherDetailRoute()),
-      ),
-    );
-  }
+class _TeachersScreenState extends EntityListState<Teacher, TeachersScreen> {
+  @override
+  String get title => t.teachersScreen.title;
 
-  Widget _buildTeacherList(BuildContext context, WidgetRef ref, List<Teacher> teachers) {
-    return ListView(
-      children: teachers
-          .map(
-            (teacher) => DismissibleTile(
-              key: ValueKey(teacher),
-              action: DismissibleAction.actionDelete,
-              promptTitle: teacher.name,
-              promptText: 'Prompt.DeleteTeacher'.tr(),
-              onDismissed: (_) => _deleteTeacher(ref, teacher.id),
-              child: _buildTeacherTile(context, teacher),
-            ),
-          )
-          .toList(),
-    );
-  }
+  @override
+  String get emptyText => t.teachersScreen.noData;
 
-  Widget _buildTeacherTile(BuildContext context, Teacher teacher) {
+  @override
+  String get deleteText => t.prompt.deleteTeacher;
+
+  @override
+  ProviderBase<List<Teacher>> get provider => teachersProvider;
+
+  @override
+  String Function(Teacher item) get itemTitle =>
+      (t) => t.name;
+
+  @override
+  Teacher Function() get emptyItem =>
+      () => Teacher.empty();
+
+  @override
+  PageRouteInfo Function(Teacher item) get detailRoute =>
+      (value) => TeacherDetailRoute(value: value);
+
+  @override
+  AnalyticsEvent get deleteEvent => AnalyticsEvent.teachersDeleteItem;
+
+  @override
+  void deleteItem(Teacher teacher) => ref.read(teachersProvider.notifier).removeItem(teacher.id);
+
+  @override
+  void saveData() => ref.read(teachersProvider.notifier).save();
+
+  @override
+  Widget buildTile(Teacher teacher) {
     return ListTile(
-      key: ValueKey(teacher),
       leading: AvatarField(
-        avatar: teacher.avatar,
+        initialValue: teacher.photo,
         name: teacher.name,
+        radius: 24,
       ),
       title: Text(teacher.name),
       subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         spacing: FormLayout.lineSpacing,
         children: [
-          Text(teacher.subjects.foldSeparated(',')),
+          Text(teacher.subjects.join(', ')),
           if (teacher.note.isNotEmpty) Text(teacher.note),
         ],
       ),
-      onTap: () => context.pushRoute(TeacherDetailRoute(teacher: teacher)),
     );
-  }
-
-  void _deleteTeacher(WidgetRef ref, String teacherId) {
-    logEvent(AnalyticsEvent.teachersDeleteItem);
-
-    ref.read(teachersProvider.notifier).removeItem(teacherId);
-    cachedRepository.saveData();
   }
 }

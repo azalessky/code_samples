@@ -1,17 +1,12 @@
-import 'dart:io';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:in_app_review/in_app_review.dart';
 
 import 'package:student_planner/common/common.dart';
-import 'package:student_planner/helpers/helpers.dart';
-import 'package:student_planner/features/shared/shared.dart';
+import 'package:student_planner/services/services.dart';
+import 'package:student_planner/shared/shared.dart';
 
 @RoutePage()
 class HelpScreen extends StatelessWidget {
@@ -22,71 +17,97 @@ class HelpScreen extends StatelessWidget {
     return BackgroundScaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: Text('HelpScreen.Title'.tr()),
+        title: Text(t.helpScreen.title),
       ),
-      body: FutureBuilder(
-        future: PackageInfo.fromPlatform(),
-        builder: (context, snapshot) =>
-            snapshot.hasData ? _buildBody(context, snapshot.data!) : Container(),
-      ),
-    );
-  }
-
-  Widget _buildBody(BuildContext context, PackageInfo info) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      body: ConstrainedColumn(
         children: [
           FormLayout.largeSpacer,
-          Image.asset(ResourceSettings.androidIcon, width: 64, height: 64),
-          FormLayout.fieldSpacer,
-          context.titleMedium(info.appName),
-          FormLayout.mediumSpacer,
-          context.textMedium(
-            'HelpScreen.VersionText'.tr(args: [
-              info.version.toString(),
-              info.buildNumber.toString(),
-            ]),
-          ),
+          _buildPackageInfo(context),
           FormLayout.fieldSpacer,
           const Divider(),
-          ListTile(
-            leading: const Icon(Symbols.share),
-            title: Text('HelpScreen.ShareApp'.tr()),
-            onTap: () => Share.share(
-              Platform.isIOS ? AppSettings.iOSAppUrl : AppSettings.androidAppUrl,
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Symbols.star),
-            title: Text('HelpScreen.RateApp'.tr()),
-            onTap: () => _rateAppHandler(context),
-          ),
-          ListTile(
-            leading: const Icon(Symbols.email),
-            title: Text('HelpScreen.ContactDev'.tr()),
-            onTap: () => launchUrl(
-              Uri.parse('${AppSettings.supportEmail}%20${info.version}'),
-              mode: LaunchMode.externalNonBrowserApplication,
-            ),
-          ),
+          _buildShareApp(),
+          _buildRateApp(),
+          _buildContactDev(),
+          Spacer(),
+          _buildDeleteProfile(context),
+          FormLayout.bottomSpacer,
         ],
       ),
     );
   }
 
-  void _rateAppHandler(BuildContext context) async {
+  Widget _buildPackageInfo(BuildContext context) {
+    return Column(
+      children: [
+        AppIcon(size: 64),
+        FormLayout.fieldSpacer,
+        context.titleMedium(packageInfo.appName),
+        FormLayout.mediumSpacer,
+        context.textMedium(
+          t.helpScreen.versionText(
+            version: packageInfo.version.toString(),
+            build: packageInfo.buildNumber.toString(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShareApp() {
+    return ListTile(
+      leading: const Icon(Symbols.share),
+      title: Text(t.helpScreen.shareApp),
+      onTap: () => SharePlus.instance.share(
+        ShareParams(text: StoreHelper.shareLink),
+      ),
+    );
+  }
+
+  Widget _buildRateApp() {
+    return ListTile(
+      leading: const Icon(Symbols.star),
+      title: Text(t.helpScreen.rateApp),
+      onTap: () => _openUrl(StoreHelper.directLink),
+    );
+  }
+
+  Widget _buildContactDev() {
+    return ListTile(
+      leading: const Icon(Symbols.email),
+      title: Text(t.helpScreen.contactDev),
+      onTap: () => _contactDev(),
+    );
+  }
+
+  Widget _buildDeleteProfile(BuildContext context) {
+    return TextButton.icon(
+      label: Text(t.helpScreen.deleteProfile),
+      icon: Icon(Symbols.delete),
+      onPressed: () => showPromptDialog(
+        title: t.prompt.titleConfirmation,
+        text: t.prompt.deleteProfile,
+        onConfirmed: () => _deleteProfile(context),
+      ),
+    );
+  }
+
+  Future<void> _deleteProfile(BuildContext context) async {
+    logEvent(AnalyticsEvent.userDeleteProfile);
+    await profileManager.deleteData(true);
+  }
+
+  Future<void> _contactDev() async {
+    await _openUrl('${AppSettings.supportEmail}%20${packageInfo.version}');
+  }
+
+  Future<void> _openUrl(String url) async {
     try {
-      if (Platform.isIOS) {
-        await InAppReview.instance.requestReview();
-      } else {
-        await launchUrl(
-          Uri.parse(AppSettings.androidAppUrl),
-          mode: LaunchMode.externalNonBrowserApplication,
-        );
-      }
+      await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
     } catch (_) {
-      showSnackBar(SnackBarStyle.error, 'HelpScreen.RateAppError'.tr());
+      messages.showMessage(UserMessage.errorOccurred);
     }
   }
 }
